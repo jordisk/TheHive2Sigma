@@ -3,20 +3,17 @@ import json
 import sys
 from ruamel.yaml import YAML
 from collections import OrderedDict
+import datetime
+
+now = datetime.datetime.now()
 
 #Config
 
-thehive_url = '' #including port (http://thehive.mybusiness.com:9000
+thehive_url = '' # The hive URL including port
 thehive_api = '' #Api key for The Hive
-
 thehive_case = '' # The Hive case id (20 chars)
 
 
-
-'''
-Get a list of keys from dictionary which has the given value
-https://thispointer.com/python-how-to-find-keys-by-value-in-dictionary/
-'''
 def getKeysByValue(dictOfElements, valueToFind):
     listOfKeys = list()
     listOfItems = dictOfElements.items()
@@ -25,10 +22,6 @@ def getKeysByValue(dictOfElements, valueToFind):
             listOfKeys.append(item[0])
     return  listOfKeys  
  
-'''
-Get a list of keys from dictionary which has value that matches with any value in given list of values
-https://thispointer.com/python-how-to-find-keys-by-value-in-dictionary/
-'''
 def getKeysByValues(dictOfElements, listOfValues):
     listOfKeys = list()
     listOfItems = dictOfElements.items()
@@ -49,6 +42,7 @@ def getCaseData():
 	getCaseData.case_id = json_data['caseId']
 	getCaseData.case_title = json_data['title']
 	getCaseData.case_url = thehive_url + '/index.html#/case/' + thehive_case + '/details'
+	getCaseData.case_createdBy = json_data['createdBy']
 
 
 
@@ -96,8 +90,9 @@ def createSigmaJson():
 	#Start Sigma
 	sigma_rule += "status: experimental\n"
 	sigma_rule += "description: Detects Observables based on Case " + str(getCaseData.case_id)+" from TheHive\n"
-	sigma_rule += "author: Jordi Vazquez\n"
+	sigma_rule += "author: " + getCaseData.case_createdBy + "\n"
 	sigma_rule += "references:\n    - "+ getCaseData.case_url + "\n"
+	sigma_rule += "date: " + now.strftime("%Y/%m/%d") + "\n"
 	#Maybe add tags from case
 
 	if getObservables.countTypes == 1:
@@ -105,7 +100,7 @@ def createSigmaJson():
 	elif getObservables.counter <= getObservables.countTypes:
 		sigma_rule += "---\n"
 	else:
-		print "OOOOJO que cojones pasa??"
+		print "[Error]"
 
 	#CREATES SIGMA FOR IP addresses
 	listOfKeys = getKeysByValue(getObservables.observables, 'ip')
@@ -181,6 +176,62 @@ def createSigmaJson():
 		for key in listOfKeys:
 			sigma_rule += "            - '"+ key+"'\n"
 		sigma_rule += "    condition: selection1" + "\n"
+
+		#Add lines to create antoher yaml document
+		getObservables.counter += 1
+		if getObservables.counter < getObservables.countTypes:
+			sigma_rule += "---\n"
+		else:
+			pass
+
+
+	#CREATES SIGMA for Registry keys
+	listOfKeys = getKeysByValues(getObservables.observables, 'registry')
+	if not listOfKeys :
+		pass
+		
+	else:
+		sigma_rule += "logsource:\n"
+		sigma_rule += "    product: windows" + "\n"
+		sigma_rule += "    service: sysmon" + "\n"
+		sigma_rule += "detection:" + "\n"
+		sigma_rule += "    selection2: " + "\n"
+		sigma_rule += "        EventID: " + "\n"
+		sigma_rule += "            - 13" + "\n"
+		sigma_rule += "            - 12" + "\n"
+		sigma_rule += "            - 14" + "\n"
+		sigma_rule += "        TargetObject: " + "\n"
+		#Iterate over the list of keys
+		for key in listOfKeys:
+			sigma_rule += "            - '"+ key+"'\n"
+		sigma_rule += "    condition: selection2" + "\n"
+
+		#Add lines to create antoher yaml document
+		getObservables.counter += 1
+		if getObservables.counter < getObservables.countTypes:
+			sigma_rule += "---\n"
+		else:
+			pass
+
+
+	##### WORKING #####
+	#CREATES SIGMA for Process
+	listOfKeys = getKeysByValues(getObservables.observables, 'process')
+	if not listOfKeys :
+		pass
+		
+	else:
+		sigma_rule += "logsource:\n"
+		sigma_rule += "    product: windows" + "\n"
+		sigma_rule += "    service: sysmon" + "\n"
+		sigma_rule += "detection:" + "\n"
+		sigma_rule += "    selection3: " + "\n"
+		sigma_rule += "        EventID: 1" + "\n"
+		sigma_rule += "        TargetImage: " + "\n"
+		#Iterate over the list of keys
+		for key in listOfKeys:
+			sigma_rule += "            - '*\\"+ key+"'\n"
+		sigma_rule += "    condition: selection3" + "\n"
 
 		#Add lines to create antoher yaml document
 		getObservables.counter += 1
